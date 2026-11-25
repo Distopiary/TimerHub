@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src * data: blob:; connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co; font-src 'self' data:;">
+  <meta name="theme-color" content="#0d0f14">
+  <title>TimerHub</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="icons/icon-192.png" alt="" class="brand-logo">
+      <span>TimerHub</span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-view="tasks">Tâches <span class="count" data-count="todo"></span></button>
+      <button data-view="storage">Rangement</button>
+      <button data-view="admin" class="hidden" id="tab-admin">Admin <span class="count count-alert" id="admin-count"></span></button>
+    </nav>
+    <div class="actions">
+      <span class="sync" id="sync" title=""></span>
+      <button class="btn btn-primary" id="btn-add"><span class="plus">+</span><span class="label">Nouvelle tâche</span></button>
+      <button class="icon-btn" id="btn-settings" title="Paramètres" aria-label="Paramètres">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="banner hidden" id="banner"></div>
+  <div class="banner banner-update hidden" id="update-banner"></div>
+
+  <main>
+    <div class="toolbar" id="toolbar"></div>
+    <section id="content"></section>
+    <div class="empty hidden" id="empty">
+      <div class="empty-icon">⏳</div>
+      <h2>Aucune tâche pour l'instant</h2>
+      <p>Ajoute ta première quête journalière, hebdomadaire ou un timer.</p>
+      <div class="row-buttons center-buttons">
+        <button class="btn btn-primary" id="btn-add-empty">+ Nouvelle tâche</button>
+        <button class="btn" data-action="folder-new">+ Nouveau dossier</button>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-backdrop hidden" id="modal-backdrop">
+    <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+
+  <script src="config.js"></script>
+  <script src="vendor/supabase.js"></script>
+  <script src="js/schedule.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
