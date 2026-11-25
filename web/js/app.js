@@ -140,17 +140,22 @@
   };
 
   // ---------------- Rendu ----------------
+  // Moment où la tâche est (ou sera) disponible :
+  //  - périodique à faire : depuis le début de sa période (ou la fin du timer) -> déjà passé
+  //  - périodique faite   : prochain reset / fin du timer
+  //  - unique             : date prévue
+  function availableAt(t, s) {
+    if (t.kind === 'once') return s.due.getTime();
+    if (s.done) return s.target.getTime();
+    if (t.kind === 'interval') return s.target ? s.target.getTime() : 0;
+    return s.start ? s.start.getTime() : 0;
+  }
+
+  // Tri : d'abord ce qui est disponible depuis le plus longtemps, puis ce qui le sera le plus tôt.
   function sorted(tasks, now) {
     return tasks
-      .map((t) => ({ t, s: S.status(t, now) }))
-      .sort((a, b) => {
-        if (a.s.done !== b.s.done) return a.s.done ? 1 : -1;
-        const ta = a.s.target ? a.s.target.getTime() : 0;
-        const tb = b.s.target ? b.s.target.getTime() : 0;
-        if (!a.s.done && a.t.kind === 'interval' && b.t.kind !== 'interval') return -1;
-        if (!b.s.done && b.t.kind === 'interval' && a.t.kind !== 'interval') return 1;
-        return ta - tb || a.t.title.localeCompare(b.t.title);
-      });
+      .map((t) => { const s = S.status(t, now); return { t, s, at: availableAt(t, s) }; })
+      .sort((a, b) => a.at - b.at || a.t.title.localeCompare(b.t.title));
   }
 
   function hue(str) {
@@ -220,6 +225,9 @@
     $('#tabs').classList.toggle('hidden', state.pending);
     $('#btn-add').classList.toggle('hidden', state.pending);
     $$('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === state.view));
+    // Pastille de l'onglet Tâches : les tâches uniques ne comptent que le jour J (ou si elles sont en retard)
+    const endOfToday = new Date(now); endOfToday.setHours(24, 0, 0, 0);
+    counts.badge = all.filter((x) => !x.s.done && (x.t.kind !== 'once' || x.s.due < endOfToday)).length;
     $$('[data-count]').forEach((el) => { el.textContent = counts[el.dataset.count] || ''; });
 
     const empty = $('#empty');
@@ -247,7 +255,7 @@
     else renderTasks(all, counts, now);
 
     state.sig = signature(now);
-    document.title = counts.todo ? `(${counts.todo}) TimerHub` : 'TimerHub';
+    document.title = counts.badge ? `(${counts.badge}) TimerHub` : 'TimerHub';
   }
 
   function renderTasks(all, counts, now) {
@@ -261,7 +269,38 @@
       content.innerHTML = `<p class="muted center">${state.filter === 'done' ? 'Rien de validé pour le moment.' : 'Tout est fait, bravo ! 🎉'}</p>`;
       return;
     }
-    content.innerHTML = `<div class="grid">${visible.map((x) => cardHtml(x, now, { showFolder: true })).join('')}</div>`;
+    content.innerHTML = availStrip(all, now) + `<div class="grid">${visible.map((x) => cardHtml(x, now, { showFolder: true })).join('')}</div>`;
+  }
+
+  // Ligne du haut : tâches périodiques disponibles maintenant (journalières, hebdos, timers prêts)
+  function availStrip(all, now, ignoreFilter = false) {
+    if (!ignoreFilter && state.filter === 'done') return '';
+    const avail = all.filter((x) => x.t.kind !== 'once' && !x.s.done);
+    if (!avail.length) return '';
+    const chip = ({ t, s }) => {
+      const canLaunch = t.launch_type && t.launch_type !== 'none' && t.launch_target;
+      const thumb = t.image_url
+        ? `<span class="avail-thumb" style="background-image:url('${esc(t.image_url)}')"></span>`
+        : `<span class="avail-thumb placeholder" style="--h:${hue(t.title)}">${esc(initials(t.title))}</span>`;
+      return `
+        <div class="avail-chip kind-${t.kind}" data-id="${esc(t.id)}">
+          <button class="check" data-action="toggle" title="Marquer comme fait" aria-label="Marquer « ${esc(t.title)} » comme fait">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          ${thumb}
+          <span class="avail-text">
+            <span class="avail-title" title="${esc(t.title)}">${esc(t.title)}</span>
+            <span class="avail-meta timer">${esc(S.timerText(t, s, now))}</span>
+          </span>
+          ${canLaunch ? `<button class="icon-btn avail-launch" data-action="launch" title="Lancer" aria-label="Lancer ${esc(t.title)}">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></button>` : ''}
+        </div>`;
+    };
+    return `
+      <section class="avail">
+        <div class="avail-head">⚡ Disponibles maintenant <span class="count">${avail.length}</span></div>
+        <div class="avail-row">${avail.map(chip).join('')}</div>
+      </section>`;
   }
 
   function folderSection(id, name, items, now, isReal) {
@@ -353,7 +392,8 @@
           <div class="cal-items">${items.map(({ t, o }) => calItem(t, o, now)).join('') || '<p class="cal-empty">Rien de prévu</p>'}</div>
         </div>`);
     }
-    content.innerHTML = `<div class="cal ${state.calMode === 'day' ? 'cal-mode-day' : 'cal-mode-week'}">${cols.join('')}</div>
+    content.innerHTML = availStrip(sorted(state.tasks, now), now, true)
+      + `<div class="cal ${state.calMode === 'day' ? 'cal-mode-day' : 'cal-mode-week'}">${cols.join('')}</div>
       <p class="hint cal-legend">Journalières et hebdos : heure du reset · Timers : prochaine disponibilité · Uniques : date prévue.</p>`;
   }
 
@@ -452,12 +492,16 @@
     const now = new Date();
     if (signature(now) !== state.sig) { render(); return; }
     for (const t of state.tasks) {
-      const el = content.querySelector(`[data-id="${CSS.escape(t.id)}"]`);
-      if (!el) continue;
+      const els = content.querySelectorAll(`[data-id="${CSS.escape(t.id)}"]`);
+      if (!els.length) continue;
       const s = S.status(t, now);
-      el.querySelector('.timer').textContent = S.timerText(t, s, now);
-      if (t.kind === 'once') el.classList.toggle('late', now >= s.end);
-      el.querySelector('.progress span').style.width = (S.progress(t, s, now) * 100).toFixed(1) + '%';
+      els.forEach((el) => {
+        const timer = el.querySelector('.timer');
+        if (timer) timer.textContent = S.timerText(t, s, now);
+        if (t.kind === 'once') el.classList.toggle('late', now >= s.end);
+        const bar = el.querySelector('.progress span');
+        if (bar) bar.style.width = (S.progress(t, s, now) * 100).toFixed(1) + '%';
+      });
     }
   }
 
@@ -1283,7 +1327,7 @@
         else { setCollapsed(id, !state.collapsed[id]); render(); }
         return;
       }
-      const card = e.target.closest('.card');
+      const card = e.target.closest('.card, .avail-chip');
       if (!card) return;
       const t = state.tasks.find((x) => x.id === card.dataset.id);
       if (!t) return;
