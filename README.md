@@ -23,14 +23,12 @@ Lance `dist\TimerHub Setup 1.0.0.exe`. L'installateur n'est pas signé : si Wind
 - La personne validée voit sa page se débloquer automatiquement.
 
 ## Version téléphone
-1. Crée un compte gratuit sur netlify.com, puis va dans **Sites → Add new site → Deploy manually**.
-2. Glisse-dépose le dossier `web` (il doit contenir `vendor/supabase.js`, créé par `npm install`).
-3. Ouvre l'adresse obtenue sur ton téléphone, puis :
-   - Android (Chrome) : menu ⋮ → **Ajouter à l'écran d'accueil** ;
+En ligne sur **https://distopiary.github.io/TimerHub/** (GitHub Pages, mis à jour automatiquement à chaque
+modification du dossier `web/` poussée sur GitHub).
+1. Ouvre l'adresse sur ton téléphone, puis :
+   - Android (Chrome) : menu ⋮ → **Ajouter à l'écran d'accueil** (ou **Installer l'application**) ;
    - iPhone (Safari) : bouton Partager → **Sur l'écran d'accueil**.
-4. Connecte-toi avec le même compte que sur le PC.
-
-À chaque modification de `web/`, redépose le dossier sur Netlify.
+2. Connecte-toi avec le même identifiant que sur le PC.
 
 ## Utilisation
 - **Journalière / Hebdomadaire** : la case se décoche toute seule à l'heure (et au jour) de reset choisis.
@@ -55,7 +53,7 @@ Publier une nouvelle version (après tes modifications) :
 .\scripts\release.ps1 1.0.1
 ```
 Le script met à jour le numéro de version, construit l'installateur, le publie sur GitHub, puis commit et pousse le code.
-Pense à redéposer le dossier `web` sur Netlify si l'interface a changé.
+La version téléphone se met à jour en même temps (GitHub Pages).
 
 ## Développement
 ```powershell
