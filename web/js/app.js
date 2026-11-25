@@ -401,7 +401,7 @@
       el.title = cloudConfigured ? 'Non connecté : données sur cet appareil uniquement' : 'Mode local';
       el.textContent = 'Local';
       if (cloudConfigured && !lsGet('bannerDismissed', false)) {
-        banner.innerHTML = 'Mode local : connecte-toi pour synchroniser avec ton téléphone. <button class="link" data-open="settings">Se connecter</button> <button class="link muted" data-dismiss>Masquer</button>';
+        banner.innerHTML = 'Mode local : connecte-toi pour synchroniser tes tâches entre ton PC et ton téléphone. <button class="link" data-open="settings">Se connecter</button> <button class="link muted" data-dismiss>Masquer</button>';
         banner.classList.remove('hidden');
       } else banner.classList.add('hidden');
     }
