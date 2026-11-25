@@ -1,7 +1,7 @@
 {
   "name": "timerhub",
   "productName": "TimerHub",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Timers de quêtes journalières, hebdomadaires et personnalisés",
   "main": "main.js",
   "author": "Ruby",

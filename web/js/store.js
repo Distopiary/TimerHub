@@ -24,7 +24,7 @@
 
   const FIELDS = {
     tasks: ['title', 'kind', 'reset_hour', 'reset_minute', 'reset_weekday', 'interval_minutes',
-      'last_done_at', 'prev_done_at', 'links', 'image_url', 'launch_type', 'launch_target', 'notify', 'position', 'folder_id'],
+      'last_done_at', 'prev_done_at', 'links', 'image_url', 'launch_type', 'launch_target', 'notify', 'position', 'folder_id', 'due_at', 'duration_minutes'],
     folders: ['name', 'position'],
   };
   const pick = (table, obj) => {

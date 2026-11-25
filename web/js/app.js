@@ -22,6 +22,8 @@
     view: lsGet('view', 'tasks'),
     collapsed: lsGet('collapsed', {}),
     filter: lsGet('filter', 'all'),
+    calMode: lsGet('calMode', 'week'),
+    calAnchor: new Date(),
     store: null,
     client: null,
     user: null,
@@ -157,6 +159,8 @@
     return h;
   }
 
+  const KIND_LABEL = { daily: 'Journalière', weekly: 'Hebdo', interval: 'Timer', once: 'Unique' };
+
   function initials(title) {
     const words = String(title).trim().split(/[\s\-_:]+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
     const s = words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '?').slice(0, 2);
@@ -164,7 +168,7 @@
   }
 
   function cardHtml({ t, s }, now, opts = {}) {
-    const kindLabel = { daily: 'Journalière', weekly: 'Hebdo', interval: 'Timer' }[t.kind];
+    const kindLabel = KIND_LABEL[t.kind];
     const canLaunch = t.launch_type && t.launch_type !== 'none' && t.launch_target;
     const media = t.image_url
       ? `<div class="card-media" style="background-image:url('${esc(t.image_url)}')"></div>`
@@ -180,7 +184,7 @@
             <svg viewBox="0 0 24 24" width="14" height="14"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>${esc(launchLabel)}</button>` : ''}
         </div>` : '';
     return `
-      <article class="card ${s.done ? 'done' : 'ready'} kind-${t.kind}" data-id="${esc(t.id)}" ${opts.draggable ? 'draggable="true"' : ''}>
+      <article class="card ${s.done ? 'done' : 'ready'} kind-${t.kind} ${t.kind === 'once' && now >= s.end ? 'late' : ''}" data-id="${esc(t.id)}" ${opts.draggable ? 'draggable="true"' : ''}>
         <div class="card-top">
           ${media}
           <span class="badge badge-${t.kind}">${kindLabel}</span>
@@ -190,7 +194,7 @@
           </button>
         </div>
         <div class="card-body">
-          <button class="check" data-action="toggle" role="checkbox" aria-checked="${s.done}" title="${s.done ? 'Annuler la validation' : 'Marquer comme fait'}">
+          <button class="check" data-action="toggle" role="checkbox" aria-checked="${s.done}" title="${t.kind === 'once' ? 'Marquer comme terminée' : s.done ? 'Annuler la validation' : 'Marquer comme fait'}">
             <svg viewBox="0 0 24 24" width="18" height="18"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <div class="info">
@@ -239,6 +243,7 @@
     toolbar.classList.toggle('hidden', noData);
 
     if (state.view === 'storage') renderStorage(all, now);
+    else if (state.view === 'calendar') renderCalendar(now);
     else renderTasks(all, counts, now);
 
     state.sig = signature(now);
@@ -283,6 +288,73 @@
           ? `<div class="grid">${items.map((x) => cardHtml(x, now, { draggable: true })).join('')}</div>`
           : `<p class="folder-empty">Glisse des tâches ici, ou choisis ce dossier dans une tâche.</p>`}</div>`}
       </section>`;
+  }
+
+  // ---------------- Calendrier ----------------
+  const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const startOfWeek = (d) => { const x = startOfDay(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  function calRange() {
+    const from = state.calMode === 'day' ? startOfDay(state.calAnchor) : startOfWeek(state.calAnchor);
+    const days = state.calMode === 'day' ? 1 : 7;
+    return { from, days, to: addDays(from, days) };
+  }
+
+  function calItem(t, o, now) {
+    const st = S.status(t, now);
+    const done = o.current && st.done;
+    const past = !o.current && (o.end || o.date) < now;
+    const time = o.end ? `${S.hm(o.date)}–${S.hm(o.end)}` : S.hm(o.date);
+    const label = { Reset: t.kind === 'weekly' ? 'Reset hebdo' : 'Reset', Disponible: 'Timer disponible', Prêt: 'Timer prêt', Unique: 'Unique' }[o.label] || o.label;
+    return `
+      <button class="cal-item kind-${t.kind} ${done ? 'done' : ''} ${past ? 'past' : ''} ${o.ready ? 'ready' : ''}" data-cal-task="${esc(t.id)}" title="${esc(t.title)} — ${esc(S.describe(t))}">
+        <span class="cal-time">${time}</span>
+        <span class="cal-dot"></span>
+        <span class="cal-title">${esc(t.title)}</span>
+        <span class="cal-label">${done ? '✓ Fait' : esc(label)}</span>
+      </button>`;
+  }
+
+  function renderCalendar(now) {
+    const { from, days } = calRange();
+    const last = addDays(from, days - 1);
+    const title = state.calMode === 'day'
+      ? `${S.WEEKDAYS[from.getDay()][0].toUpperCase() + S.WEEKDAYS[from.getDay()].slice(1)} ${S.dayMonth(from)} ${from.getFullYear()}`
+      : `Du ${S.dayMonth(from)} au ${S.dayMonth(last)} ${last.getFullYear()}`;
+    toolbar.innerHTML = `
+      <div class="filters">
+        <button data-cal-mode="day" class="${state.calMode === 'day' ? 'active' : ''}">Jour</button>
+        <button data-cal-mode="week" class="${state.calMode === 'week' ? 'active' : ''}">Semaine</button>
+      </div>
+      <div class="cal-nav">
+        <button class="icon-btn" data-cal-nav="-1" aria-label="Précédent">‹</button>
+        <button class="btn btn-ghost btn-sm" data-cal-nav="0">Aujourd'hui</button>
+        <button class="icon-btn" data-cal-nav="1" aria-label="Suivant">›</button>
+      </div>
+      <h2 class="cal-title-range">${esc(title)}</h2>`;
+
+    const cols = [];
+    for (let i = 0; i < days; i++) {
+      const dayStart = addDays(from, i);
+      const dayEnd = addDays(dayStart, 1);
+      const items = state.tasks
+        .flatMap((t) => S.occurrences(t, dayStart, dayEnd, now).map((o) => ({ t, o })))
+        .sort((a, b) => a.o.date - b.o.date || a.t.title.localeCompare(b.t.title));
+      const isToday = sameDay(dayStart, now);
+      cols.push(`
+        <div class="cal-day ${isToday ? 'today' : ''} ${dayEnd <= now ? 'is-past' : ''}">
+          <div class="cal-day-head">
+            <span class="cal-wd">${S.WEEKDAYS[dayStart.getDay()].slice(0, 3)}.</span>
+            <span class="cal-num">${dayStart.getDate()}</span>
+            ${isToday ? '<span class="cal-today">Aujourd\'hui</span>' : ''}
+          </div>
+          <div class="cal-items">${items.map(({ t, o }) => calItem(t, o, now)).join('') || '<p class="cal-empty">Rien de prévu</p>'}</div>
+        </div>`);
+    }
+    content.innerHTML = `<div class="cal ${state.calMode === 'day' ? 'cal-mode-day' : 'cal-mode-week'}">${cols.join('')}</div>
+      <p class="hint cal-legend">Journalières et hebdos : heure du reset · Timers : prochaine disponibilité · Uniques : date prévue.</p>`;
   }
 
   function renderPending() {
@@ -384,6 +456,7 @@
       if (!el) continue;
       const s = S.status(t, now);
       el.querySelector('.timer').textContent = S.timerText(t, s, now);
+      if (t.kind === 'once') el.classList.toggle('late', now >= s.end);
       el.querySelector('.progress span').style.width = (S.progress(t, s, now) * 100).toFixed(1) + '%';
     }
   }
@@ -430,6 +503,7 @@
   }
 
   async function toggleDone(t) {
+    if (t.kind === 'once') { openReschedule(t); return; }
     const s = S.status(t, new Date());
     const patch = s.done
       ? { last_done_at: t.prev_done_at || null, prev_done_at: null }
@@ -442,6 +516,75 @@
       toast('Échec de la sauvegarde : ' + e.message, 'error');
       reload();
     }
+  }
+
+  // ---------------- Tâche unique : reprogrammer ou supprimer ----------------
+  // Décale la date de n jours (même heure) jusqu'à tomber dans le futur.
+  function shiftedDue(t, days) {
+    const d = new Date(t.due_at || Date.now());
+    const now = new Date();
+    do { d.setDate(d.getDate() + days); } while (d < now);
+    return d;
+  }
+  const fmtLong = (d) => `${S.WEEKDAYS[d.getDay()]} ${S.dayMonth(d)} à ${S.hm(d)}`;
+
+  function openReschedule(t) {
+    const d1 = shiftedDue(t, 1);
+    const d7 = shiftedDue(t, 7);
+    openModal(`
+      <div class="modal-head">
+        <h2>« ${esc(t.title)} » terminée ✓</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Fermer">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="muted" style="margin:0">Remettre cette tâche plus tard ?</p>
+        <div class="choice-grid">
+          <button class="choice" data-resched="1"><b>Dans 1 jour</b><span>${esc(fmtLong(d1))}</span></button>
+          <button class="choice" data-resched="7"><b>Dans 7 jours</b><span>${esc(fmtLong(d7))}</span></button>
+          <button class="choice" data-resched="custom"><b>Date à définir</b><span>Choisir le jour et l'heure</span></button>
+          <button class="choice choice-danger" data-resched="no"><b>Non</b><span>Supprimer la tâche</span></button>
+        </div>
+        <form class="custom-date hidden" id="resched-form">
+          <label class="field"><span>Nouvelle date et heure</span>
+            <input type="datetime-local" name="due" required value="${S.toLocalInput(d1)}"></label>
+          <button type="submit" class="btn btn-primary">Reprogrammer</button>
+        </form>
+      </div>`, (root) => {
+      const apply = async (date) => {
+        try {
+          const patch = { due_at: date.toISOString(), last_done_at: new Date().toISOString() };
+          Object.assign(t, patch);
+          await state.store.update('tasks', t.id, patch);
+          closeModal();
+          toast(`Reprogrammée : ${fmtLong(date)}`, 'success');
+          reload();
+        } catch (e) { toast('Reprogrammation impossible : ' + e.message, 'error'); }
+      };
+      root.addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-resched]');
+        if (!b) return;
+        const v = b.dataset.resched;
+        if (v === '1') apply(d1);
+        else if (v === '7') apply(d7);
+        else if (v === 'custom') {
+          $('#resched-form', root).classList.remove('hidden');
+          $('#resched-form input', root).focus();
+        } else if (v === 'no') {
+          try {
+            await state.store.remove('tasks', t.id);
+            closeModal();
+            toast(`« ${t.title} » supprimée`);
+            reload();
+          } catch (err) { toast('Suppression impossible : ' + err.message, 'error'); }
+        }
+      });
+      $('#resched-form', root).addEventListener('submit', (e) => {
+        e.preventDefault();
+        const date = new Date(e.target.elements.due.value);
+        if (Number.isNaN(date.getTime())) { toast('Date invalide', 'error'); return; }
+        apply(date);
+      });
+    });
   }
 
   // ---------------- Dossiers ----------------
@@ -530,7 +673,10 @@
       const s = S.status(t, new Date(now));
       if (s.done) continue;
       let key; let msg;
-      if (t.kind === 'interval') {
+      if (t.kind === 'once') {
+        key = s.due.getTime();
+        msg = 'C\'est l\'heure !';
+      } else if (t.kind === 'interval') {
         if (!s.target) continue;
         key = s.target.getTime();
         msg = 'Le timer est terminé, c\'est prêt !';
@@ -602,8 +748,12 @@
   function openEditor(task, defaults = {}) {
     const t = task ? { ...task } : {
       title: '', kind: 'daily', reset_hour: 4, reset_minute: 0, reset_weekday: 1, interval_minutes: 480,
-      links: [], image_url: null, launch_type: 'none', launch_target: '', notify: true, folder_id: null, ...defaults,
+      links: [], image_url: null, launch_type: 'none', launch_target: '', notify: true, folder_id: null,
+      due_at: null, duration_minutes: 60, ...defaults,
     };
+    const nextHour = new Date(); nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+    const dueLocal = S.toLocalInput(t.due_at ? new Date(t.due_at) : nextHour);
+    const dur = t.duration_minutes ?? 60;
     state.form = { id: task ? task.id : null, image: t.image_url || null, blob: null, previewUrl: null, links: (t.links || []).map((l) => ({ ...l })) };
     const time = `${S.pad(t.reset_hour)}:${S.pad(t.reset_minute)}`;
     const ih = Math.floor(t.interval_minutes / 60);
@@ -635,7 +785,21 @@
               <button type="button" data-value="daily">Journalière</button>
               <button type="button" data-value="weekly">Hebdomadaire</button>
               <button type="button" data-value="interval">Timer</button>
+              <button type="button" data-value="once">Unique</button>
             </div>
+          </div>
+
+          <div class="kind-only" data-kind="once">
+            <label class="field"><span>Date et heure</span>
+              <input type="datetime-local" name="due_local" value="${dueLocal}"></label>
+            <div class="row" style="margin-top:12px">
+              <label class="field"><span>Durée (heures)</span><input type="number" name="dh" min="0" max="999" value="${Math.floor(dur / 60)}"></label>
+              <label class="field"><span>Durée (minutes)</span><input type="number" name="dm" min="0" max="59" value="${dur % 60}"></label>
+            </div>
+            <div class="presets">
+              ${[[15, '15 min'], [30, '30 min'], [60, '1h'], [120, '2h'], [0, 'Sans durée']].map(([m, l]) => `<button type="button" class="chip" data-dur="${m}">${l}</button>`).join('')}
+            </div>
+            <p class="hint">Une fois validée, tu choisis de la reprogrammer (1 jour, 7 jours, autre date) ou de la supprimer.</p>
           </div>
 
           <div class="row kind-only" data-kind="daily weekly">
@@ -748,6 +912,9 @@
     $$('[data-preset]', root).forEach((b) => b.addEventListener('click', () => {
       form.elements.ih.value = b.dataset.preset; form.elements.im.value = 0;
     }));
+    $$('[data-dur]', root).forEach((b) => b.addEventListener('click', () => {
+      const m = +b.dataset.dur; form.elements.dh.value = Math.floor(m / 60); form.elements.dm.value = m % 60;
+    }));
 
     // Image
     const preview = $('#image-preview', root);
@@ -830,6 +997,14 @@
       const [hh, mm] = (f.reset_time.value || '00:00').split(':').map(Number);
       const interval = (parseInt(f.ih.value, 10) || 0) * 60 + (parseInt(f.im.value, 10) || 0);
       if (kind === 'interval' && interval < 1) { toast('Le timer doit durer au moins 1 minute', 'error'); return; }
+      let dueAt = t.due_at || null;
+      let duration = t.duration_minutes ?? 60;
+      if (kind === 'once') {
+        const d = new Date(f.due_local.value);
+        if (!f.due_local.value || Number.isNaN(d.getTime())) { toast('Indique la date et l\'heure', 'error'); return; }
+        dueAt = d.toISOString();
+        duration = (parseInt(f.dh.value, 10) || 0) * 60 + (parseInt(f.dm.value, 10) || 0);
+      }
 
       const launchType = f.launch_type.value;
       let target = null;
@@ -866,6 +1041,8 @@
           launch_target: target,
           notify: f.notify.checked,
           folder_id: f.folder_id.value || null,
+          due_at: dueAt,
+          duration_minutes: duration,
         };
         if (state.form.id) await state.store.update('tasks', state.form.id, data);
         else await state.store.insert('tasks', { ...data, position: state.tasks.length });
@@ -1026,6 +1203,14 @@
     toolbar.addEventListener('click', (e) => {
       const f = e.target.closest('button[data-filter]');
       if (f) { state.filter = f.dataset.filter; lsSet('filter', state.filter); render(); return; }
+      const cm = e.target.closest('[data-cal-mode]');
+      if (cm) { state.calMode = cm.dataset.calMode; lsSet('calMode', state.calMode); render(); return; }
+      const cn = e.target.closest('[data-cal-nav]');
+      if (cn) {
+        const n = +cn.dataset.calNav;
+        state.calAnchor = n === 0 ? new Date() : addDays(state.calAnchor, n * (state.calMode === 'day' ? 1 : 7));
+        render(); return;
+      }
       const a = e.target.closest('[data-action]');
       if (!a) return;
       if (a.dataset.action === 'folder-new') openFolderForm(null);
@@ -1077,6 +1262,8 @@
     content.addEventListener('click', (e) => {
       const adminBtn = e.target.closest('[data-admin]');
       if (adminBtn) { adminAction(adminBtn.dataset.admin, adminBtn.closest('[data-member]').dataset.member); return; }
+      const calBtn = e.target.closest('[data-cal-task]');
+      if (calBtn) { const t = state.tasks.find((x) => x.id === calBtn.dataset.calTask); if (t) openEditor(t); return; }
       const pendingBtn = e.target.closest('.pending-card [data-action]');
       if (pendingBtn) {
         if (pendingBtn.dataset.action === 'recheck') reload();

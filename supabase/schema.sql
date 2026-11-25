@@ -86,7 +86,7 @@ create table if not exists public.tasks (
   id             uuid primary key default gen_random_uuid(),
   user_id        uuid not null default auth.uid() references auth.users(id) on delete cascade,
   title          text not null,
-  kind           text not null check (kind in ('daily', 'weekly', 'interval')),
+  kind           text not null,
   reset_hour     smallint not null default 0,
   reset_minute   smallint not null default 0,
   reset_weekday  smallint not null default 1,      -- 0 = dimanche, 1 = lundi, ...
@@ -104,6 +104,12 @@ create table if not exists public.tasks (
 );
 
 create index if not exists tasks_user_idx on public.tasks (user_id);
+
+-- Tâches uniques (rendez-vous) : date prévue et durée
+alter table public.tasks add column if not exists due_at timestamptz;
+alter table public.tasks add column if not exists duration_minutes integer not null default 0;
+alter table public.tasks drop constraint if exists tasks_kind_check;
+alter table public.tasks add constraint tasks_kind_check check (kind in ('daily', 'weekly', 'interval', 'once'));
 
 -- Chaque utilisateur approuvé ne voit et ne modifie que ses propres tâches
 alter table public.tasks enable row level security;

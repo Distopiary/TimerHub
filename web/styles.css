@@ -147,6 +147,7 @@ main { padding: 18px 16px 40px; max-width: 1500px; margin: 0 auto; }
 .badge-daily { color: #9fd0ff; }
 .badge-weekly { color: #ffcf8a; }
 .badge-interval { color: #c7b6ff; }
+.badge-once { color: #ff9ec7; }
 
 .folder-tag {
   position: absolute; left: 10px; bottom: 10px; z-index: 1; max-width: calc(100% - 20px);
@@ -220,6 +221,67 @@ main { padding: 18px 16px 40px; max-width: 1500px; margin: 0 auto; }
 .folder-body { padding: 4px 14px 14px; }
 .folder-empty { margin: 0; padding: 18px; text-align: center; color: var(--muted); font-size: 13px; border: 1px dashed var(--border); border-radius: 10px; }
 .center-buttons { justify-content: center; }
+
+/* ---------- Reprogrammation (tâche unique) ---------- */
+.choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.choice {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left;
+  padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.choice:hover { border-color: var(--accent); background: var(--accent-soft); }
+.choice span { font-size: 12px; color: var(--muted); }
+.choice-danger b { color: var(--danger); }
+.choice-danger:hover { border-color: var(--danger); background: rgba(255, 92, 108, .1); }
+.custom-date { display: flex; gap: 10px; align-items: flex-end; }
+
+/* ---------- Calendrier ---------- */
+.cal-nav { display: flex; align-items: center; gap: 2px; }
+.cal-nav .icon-btn { font-size: 22px; line-height: 1; }
+.cal-title-range { margin: 0 0 0 4px; font-size: 16px; font-weight: 600; }
+.cal { display: grid; gap: 10px; }
+.cal-mode-week { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cal-mode-day { grid-template-columns: minmax(0, 720px); }
+.cal-day {
+  background: rgba(21, 25, 34, .55); border: 1px solid var(--border); border-radius: var(--radius);
+  min-height: 160px; display: flex; flex-direction: column; overflow: hidden;
+}
+.cal-day.today { border-color: rgba(139, 108, 255, .55); box-shadow: 0 0 0 1px rgba(139, 108, 255, .15); }
+.cal-day.is-past { opacity: .6; }
+.cal-day-head { display: flex; align-items: baseline; gap: 6px; padding: 10px 12px 8px; border-bottom: 1px solid var(--border); }
+.cal-wd { font-size: 12px; color: var(--muted); text-transform: capitalize; }
+.cal-num { font-size: 18px; font-weight: 700; }
+.cal-today { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .05em; }
+.cal-items { display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.cal-empty { margin: 8px 4px; font-size: 12px; color: var(--muted); }
+.cal-item {
+  --k: var(--accent);
+  display: grid; grid-template-columns: auto 1fr; grid-template-areas: "time label" "title title";
+  gap: 2px 8px; align-items: center; text-align: left; width: 100%;
+  padding: 7px 9px 7px 11px; border-radius: 9px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border); border-left: 3px solid var(--k);
+  transition: background .15s, border-color .15s;
+}
+.cal-item:hover { background: var(--surface-3); }
+.cal-item.kind-daily { --k: #6fb7ff; }
+.cal-item.kind-weekly { --k: #ffb44d; }
+.cal-item.kind-interval { --k: #a58bff; }
+.cal-item.kind-once { --k: #ff7eb6; }
+.cal-item.ready { background: var(--accent-soft); }
+.cal-item.done, .cal-item.past { opacity: .55; }
+.cal-item.done .cal-title { text-decoration: line-through; }
+.cal-dot { display: none; }
+.cal-time { grid-area: time; font-size: 11px; font-weight: 700; color: var(--k); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cal-label { grid-area: label; justify-self: end; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-title { grid-area: title; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-mode-day .cal-item { grid-template-columns: 90px 1fr auto; grid-template-areas: "time title label"; padding: 10px 12px; }
+.cal-mode-day .cal-time { font-size: 13px; }
+.cal-mode-day .cal-title { font-size: 14px; }
+.cal-mode-day .cal-label { font-size: 11px; }
+.cal-legend { margin-top: 12px; }
+@media (max-width: 1100px) {
+  .cal-mode-week { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
 
 /* ---------- Compte en attente ---------- */
 .pending-card {
@@ -295,7 +357,9 @@ input:not([type="checkbox"]):not([type="file"]), select {
   background: var(--bg-2); outline: none; transition: border-color .15s, box-shadow .15s;
 }
 input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(.8); }
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(.8); cursor: pointer; }
+.card.late .timer { color: var(--warn); }
 .input-group { display: flex; gap: 8px; }
 .hint { margin: -4px 0 0; font-size: 12px; color: var(--muted); }
 
@@ -340,7 +404,15 @@ input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(.8); }
   .topbar { gap: 10px; padding-left: 12px; padding-right: 12px; flex-wrap: wrap; height: auto; padding-bottom: 8px; }
   .brand span { display: none; }
   .tabs { order: 3; width: 100%; }
-  .tabs button { flex: 1; justify-content: center; }
+  .tabs button { flex: 1; justify-content: center; padding: 8px 6px; font-size: 13px; }
+  .tabs button.active::after { left: 8px; right: 8px; }
+  .cal-mode-week { grid-template-columns: 1fr; }
+  .cal-day { min-height: 0; }
+  .cal-day.is-past { display: none; }
+  .cal-title-range { width: 100%; margin: 4px 0 0; font-size: 15px; }
+  .choice-grid { grid-template-columns: 1fr; }
+  .custom-date { flex-direction: column; align-items: stretch; }
+  .cal-mode-day .cal-item { grid-template-columns: 70px 1fr; grid-template-areas: "time label" "title title"; }
   .filters { width: 100%; }
   .filters button { flex: 1; justify-content: center; }
   .folder-head { padding: 8px 6px 8px 10px; gap: 6px; }
